@@ -14,8 +14,6 @@ An APRS to MeshCore Bridge.
 
 :fire: Change the gateway's APRS map icon. See [APRS_SYMBOLS.md](./APRS_SYMBOLS.md) for details.
 
-:fire: 2-minute [YouTube demo](https://www.youtube.com/watch?v=qUvpZUwl-cY)
-
 :fire: Call sign registrations are now (optionally) beaconed to [MESHID-01](https://aprs.fi/?c=message&call=MESHID-01) to facilitate a global roaming profile.
 
 The bundled registration database updates from the MC-APRS repository. Local and APRS-beaconed registrations are also supported.
@@ -73,15 +71,16 @@ Send `aprs?` as a direct message for a private online reply, or send it on Publi
 On Debian-based systems, install and run the edited copy from a local clone in a virtual environment. This avoids trying to modify the OS-managed Python installation (PEP 668):
 
 ```console
+git clone https://github.com/Mambo430/MC-APRS.git
 cd /home/spiritual/MC-APRS
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/python -m mc_aprs
 ```
 
-The editable install uses the code in this checkout, so changes you make are available without reinstalling. Always use `.venv/bin/python` to run this checkout; `/usr/bin/python` is separate and will not see the package installed in the virtual environment. `pip install mc-aprs` installs the published PyPI release and will not include unpublished local changes.
+The editable install uses the code in this checkout, so changes you make are available without reinstalling. Always use `.venv/bin/python` to run this checkout; `/usr/bin/python` is separate and will not see the package installed in the virtual environment.
 
-To install the published release instead:
+**Install the published release:**
 
 ```console
 python3 -m venv .venv
