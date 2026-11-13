@@ -2,9 +2,6 @@
 
 An APRS to MeshCore Bridge.
 
-[![PyPI - Version](https://img.shields.io/pypi/v/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
-
 ---
 
 > [!WARNING]
