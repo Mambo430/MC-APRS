@@ -2,6 +2,10 @@
 
 An APRS to MeshCore Bridge.
 
+
+[![PyPI - Version](https://img.shields.io/pypi/v/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
+
 ---
 
 > [!WARNING]
@@ -82,9 +86,9 @@ python3 -m venv .venv
 .venv/bin/python -m mc_aprs
 ```
 
-The editable install uses the code in this checkout, so changes you make are available without reinstalling. Always use `.venv/bin/python` to run this checkout; `/usr/bin/python` is separate and will not see the package installed in the virtual environment.
+The editable install uses the code in this checkout, so changes you make are available without reinstalling. Always use `.venv/bin/python` to run this checkout; `/usr/bin/python` is separate and will not see the package installed in the virtual environment. `pip install mc-aprs` installs the published PyPI release and will not include unpublished local changes.
 
-**Install the published release:**
+**Install the published release instead:**
 
 ```console
 python3 -m venv .venv
