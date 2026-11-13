@@ -66,7 +66,7 @@ Use the following command to print the gateway's info and version.
 
 **Check whether the gateway is online:**
 
-Send `aprs?` as a direct message for a private online reply, or send it on Public/channel 0 for a public response. The command is case-insensitive and does not require registration. Channel 0 messages may include a sender prefix (for example, `KQ4WAA-MAMBO: aprs?`); the gateway recognizes the command after that prefix. For each channel request, it sends a Flood Advert after its reply so nearby nodes can discover it and start a direct conversation, regardless of the periodic auto-advert setting or when the previous advert was sent.
+Send `aprs?` as a direct message for a private online reply, or send it on Public/channel 0 for a public response. The command is case-insensitive and does not require registration. Channel 0 messages may include a sender prefix (for example, `N0CALL-1: aprs?`); the gateway recognizes the command after that prefix. For each channel request, it sends a Flood Advert after its reply so nearby nodes can discover it and start a direct conversation, regardless of the periodic auto-advert setting or when the previous advert was sent.
 
 ## Installation, Configuration, and Running
 
