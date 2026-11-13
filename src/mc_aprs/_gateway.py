@@ -1,54 +1,33 @@
-import aprslib
-from aprslib.parsing import parse
-import pubsub
-import time
-import sys
-import json
 import time
 import logging
 import warnings
 import random
-import threading
 import re
-import os
 import traceback
-import meshtastic.stream_interface
-import meshtastic.serial_interface
-from datetime import datetime
-from meshtastic.util import findPorts
-
 from queue import Queue, Empty
 from .__about__ import __version__
 from ._aprs_client import APRSClient
 from ._aprs_symbols import get_symbol_code
+from ._meshcore_interface import MeshCoreInterface
 from ._registry import CallSignRegistry
 
-logger = logging.getLogger("aprstastic")
-
-from aprslib.parsing import parse
+logger = logging.getLogger("mc_aprs")
 
 MAX_APRS_TEXT_MESSAGE_LENGTH = 67
-MAX_APRS_POSITION_MESSAGE_LENGTH = 43
 
-APRS_SOFTWARE_ID = "APZMAG"  # Experimental Meshtastic-APRS Gateway
-MQTT_TOPIC = "meshtastic.receive"
+APRS_SOFTWARE_ID = "APZMCG"  # Experimental MeshCore-APRS Gateway
 REGISTRATION_BEACON = "MESHID-01"
 GATEWAY_BEACON_INTERVAL = 3600  # Station beacons once an hour
 
 SERIAL_WATCHDOG_INTERVAL = 60  # Check the serial state every minute
-MESHTASTIC_WATCHDOG_INTERVAL = (
-    60 * 15
-)  # After how long should we become worried the Meshtastic device is quiet?
 
 # Beacons that mean unregister
 APRS_TOMBSTONE = "N0NE-01"
-MESH_TOMBSTONE = "!00000000"
+MESH_TOMBSTONE = "!000000000000"
 
 # Icons
 DEFAULT_GATEWAY_ICON = "OGM"
-DEFAULT_NODE_ICON = "MV"
 DEFAULT_GATEWAY_SYMBOL = "M&"
-DEFAULT_NODE_SYMBOL = "/>"
 
 # For uptime
 TIME_DURATION_UNITS = (
@@ -82,7 +61,6 @@ class Gateway(object):
 
         self._next_beacon_time = 0
         self._next_serial_check_time = 0
-        self._last_meshtastic_packet_time = 0
 
         self._registry = CallSignRegistry(config.get("data_dir"))
 
@@ -90,22 +68,19 @@ class Gateway(object):
         # For measuring uptime
         self._start_time = time.time()
 
-        # Connect to the Meshtastic device
-        device = self._config.get("meshtastic_interface", {}).get("device")
-
-        self._interface = self._get_interface(device)
-        if self._interface is None:
-            raise ValueError("No meshtastic device detected or specified.")
+        # Connect to the MeshCore Companion
+        interface_config = self._config.get("meshcore_interface", {})
+        device = interface_config.get("device")
+        baudrate = interface_config.get("baudrate", 115200)
+        flood_advert = interface_config.get("flood_advert", False)
 
         def on_recv(packet, interface=None):
             self._mesh_rx_queue.put(packet)
 
-        pubsub.pub.subscribe(on_recv, MQTT_TOPIC)
+        self._interface = self._get_interface(device, baudrate, on_recv, flood_advert)
         node_info = self._interface.getMyNodeInfo()
         self._gateway_id = node_info.get("user", {}).get("id")
         logger.debug(f"Gateway device id: {self._gateway_id}")
-
-        # Create an initial list of known call signs based on the device node database
 
         # Myself
         self._gateway_call_sign = self._config.get("call_sign", "").upper().strip()
@@ -116,21 +91,21 @@ class Gateway(object):
         if self._beacon_registrations:
             self._filtered_call_signs.append(REGISTRATION_BEACON)
 
-        # Recently seen nodes
-        for node in self._interface.nodesByNum.values():
-            presumptive_id = f"!{node['num']:08x}"
-
+        for contact in self._interface.getContacts():
+            public_key = contact.get("public_key", "").lower()
+            if len(public_key) < 12:
+                continue
+            presumptive_id = "!" + public_key[:12]
             if presumptive_id not in self._registry:
                 continue
 
-            # Heard more than a day ago
-            last_heard = node.get("lastHeard")
+            last_heard = contact.get("last_advert")
             if last_heard is None or last_heard + 3600 * 24 < time.time():
                 continue
 
-            self._filtered_call_signs.append(
-                self._registry[presumptive_id]["call_sign"]
-            )
+            call_sign = self._registry[presumptive_id]["call_sign"]
+            if call_sign not in self._filtered_call_signs:
+                self._filtered_call_signs.append(call_sign)
 
         # Connect to APRS IS
         aprsis_passcode = self._config.get("aprsis_passcode")
@@ -145,65 +120,40 @@ class Gateway(object):
         logger.debug("Starting main loop.")
 
         gateway_beacon = self._config.get("gateway_beacon", {})
-
-        self._last_meshtastic_packet_time = self._start_time
+        if gateway_beacon.get("enabled") and (
+            gateway_beacon.get("latitude") is None
+            or gateway_beacon.get("longitude") is None
+        ):
+            logger.warning(
+                "Gateway APRS beaconing is enabled but coordinates are missing; "
+                "set gateway_beacon.latitude and gateway_beacon.longitude."
+            )
 
         while True:
             # There are four independent steps performed by this loop: servicing watchdogs,
-            # beaconing, reading from Meshtastic, and reading from APRS.
+            # beaconing, reading from MeshCore, and reading from APRS.
             # Make sure that errors in one don't stop the others.
             now = time.time()
 
             # 1. Service the watchdogs
             ############################
-            reconnect = False
-
-            # Periodically check on the state of the device serial connection
+            # MeshCore's client handles serial reconnection. Do not treat an idle
+            # mesh as a failed connection; Companion nodes can be quiet for long periods.
             if now > self._next_serial_check_time:
                 self._next_serial_check_time = now + SERIAL_WATCHDOG_INTERVAL
-                if self._interface.stream is None or not self._interface.stream.is_open:
-                    logger.warn("Serial connection is not open.")
-                    reconnect = True
-
-            # Check if the Meshtastic device has gone silent a while
-            if (
-                reconnect == False
-                and now - self._last_meshtastic_packet_time
-                > MESHTASTIC_WATCHDOG_INTERVAL
-            ):
-                self._last_meshtastic_packet_time = now
-                logger.warn("No message from Meshtastic device for 15 minutes.")
-                reconnect = True
-                # This might be a frozen device. It may not be recoverable.
-
-            # Reconnect if needed
-            if reconnect:
-                logger.warn("Attempting to reconnect in 30 seconds.")
-                time.sleep(30)
-                try:
-                    if pubsub.pub.isSubscribed(on_recv, MQTT_TOPIC):
-                        pubsub.pub.unsubscribe(on_recv, MQTT_TOPIC)
-                    self._interface = self._get_interface(device)
-                    if self._interface is not None:
-                        pubsub.pub.subscribe(on_recv, MQTT_TOPIC)
-                except Exception as e:
-                    logger.error(traceback.format_exc())
+                if not self._interface.is_connected:
+                    logger.warning(
+                        "MeshCore serial connection is disconnected; reconnect will be attempted."
+                    )
 
             # 2. Beacon the gateway position
             ################################
             try:
                 if now > self._next_beacon_time and gateway_beacon.get("enabled"):
-                    # If the latitude and longitude are not set in the config, then read it from the radio
                     gate_lat = gateway_beacon.get("latitude")
                     gate_lon = gateway_beacon.get("longitude")
-                    if gate_lat is None or gate_lon is None:
-                        gate_position = self._interface.getMyNodeInfo().get(
-                            "position", {}
-                        )
-                        gate_lat = gate_position.get("latitude")
-                        gate_lon = gate_position.get("longitude")
 
-                    # If we still don't have a position, check again in one minute
+                    # MeshCore gateway coordinates are configured explicitly.
                     if gate_lat is None or gate_lon is None:
                         self._next_beacon_time = now + 60
                     else:
@@ -211,13 +161,13 @@ class Gateway(object):
                             gate_lat,
                             gate_lon,
                             gateway_beacon.get("icon", DEFAULT_GATEWAY_ICON),
-                            "aprstastic: " + self._gateway_id,
+                            "MC-APRS: " + self._gateway_id,
                         )
                         self._next_beacon_time = now + GATEWAY_BEACON_INTERVAL
             except Exception as e:
                 logger.error(traceback.format_exc())
 
-            # 3. Read a Meshastic packet
+            # 3. Read a MeshCore packet
             ############################
             try:
                 mesh_packet = None
@@ -227,7 +177,7 @@ class Gateway(object):
                     pass
 
                 if mesh_packet is not None:
-                    self._process_meshtastic_packet(mesh_packet)
+                    self._process_meshcore_packet(mesh_packet)
             except Exception as e:
                 logger.error(traceback.format_exc())
 
@@ -243,29 +193,21 @@ class Gateway(object):
             # Yield
             time.sleep(0.001)
 
-    def _get_interface(
-        self, device=None
-    ) -> meshtastic.stream_interface.StreamInterface:
-        if device is None:
-            ports = meshtastic.util.findPorts(True)
-            if len(ports) == 1:
-                device = ports[0]
-            else:
-                logger.error(
-                    "Please specify the correct serial port in 'aprstastic.yaml'. "
-                    f"Possible values include: {ports}"
-                )
-                return None
-        if device is not None:
-            dev = meshtastic.serial_interface.SerialInterface(device)
-            logger.info(f"Connected to: {device}")
-            return dev
-        else:
-            return None
+    def _get_interface(self, device, baudrate, on_message, flood_advert=False):
+        if not device:
+            raise ValueError(
+                "Set 'meshcore_interface.device' to the Companion serial port in "
+                "'mc-aprs.yaml'."
+            )
+        return MeshCoreInterface(
+            device, baudrate, on_message, flood_advert=flood_advert
+        ).connect()
 
-    def _process_meshtastic_packet(self, packet):
-        self._last_meshtastic_packet_time = time.time()
+    def close(self):
+        if self._interface is not None:
+            self._interface.close()
 
+    def _process_meshcore_packet(self, packet):
         fromId = packet.get("fromId", None)
         toId = packet.get("toId", None)
         portnum = packet.get("decoded", {}).get("portnum")
@@ -277,37 +219,19 @@ class Gateway(object):
         # Record that we have spotted the ID
         should_announce = self._spotted(fromId)
 
-        if portnum == "POSITION_APP":
-            if fromId not in self._registry:
-                return
-
-            # Special icon disables position sharing
-            if self._registry[fromId]["icon"] == "$$":
-                logger.info(f"{fromId} has disabled position reporting")
-            else:
-                position = packet.get("decoded", {}).get("position")
-                self._send_aprs_position(
-                    self._registry[fromId]["call_sign"],
-                    position.get("latitude"),
-                    position.get("longitude"),
-                    position.get("time"),
-                    self._registry[fromId]["icon"],
-                    "aprstastic: " + fromId,
-                )
-
         if portnum == "TEXT_MESSAGE_APP":
             message_bytes = packet["decoded"]["payload"]
             message_string = message_bytes.decode("utf-8")
 
-            if toId == "^all" and message_string.lower().strip().startswith("aprs?"):
-                self._send_mesh_message(
-                    fromId,
-                    "APRS-tastic Gateway available here. Welcome. Reply '?' for more info.",
-                )
-                return
-
             if toId != self._gateway_id:
                 # Not for me
+                return
+
+            if message_string.strip().casefold() == "aprs?":
+                self._send_mesh_message(
+                    fromId,
+                    'MC-APRS Gateway is online. Welcome! Reply "?" for more info.',
+                )
                 return
 
             if message_string.strip() == "?":
@@ -315,13 +239,16 @@ class Gateway(object):
                 if fromId not in self._registry:
                     self._send_mesh_message(
                         fromId,
-                        "Send and receive APRS messages by registering your call sign. HAM license required.\n\nReply with:\n!register [CALLSIGN]-[SSID]\nE.g.,\n!register N0CALL-1\n\nSee https://github.com/afourney/aprstastic for more.",
+                        "Register: !register CALLSIGN-SSID (e.g. !register N0CALL-1). "
+                        "Licensed operators only. Send APRS as DEST-CALL: message. "
+                        "See MC-APRS docs.",
                     )
                     return
                 else:
                     self._send_mesh_message(
                         fromId,
-                        "Send APRS messages by replying here, and prefixing your message with the dest callsign. E.g., 'WLNK-1: hello'\n\nSee https://github.com/afourney/aprstastic for more.",
+                        "Send APRS as DEST-CALL: message (e.g. N0CALL-2: hello). "
+                        "Replies may omit the prefix.",
                     )
                     return
 
@@ -336,34 +263,12 @@ class Gateway(object):
             if message_string.lower().strip().startswith("!register"):
                 # Allow operatores to join
                 m = re.search(
-                    r"^!register:?\s+([a-z0-9]{4,7}\-[0-9]{1,2})(\s+(\$\$|[a-zA-Z0-9]{2,3}))?$",
+                    r"^!register:?\s+([a-z0-9]{4,7}\-[0-9]{1,2})$",
                     message_string.lower().strip(),
                 )
                 if m:
-                    # Extract the call sign
-                    call_sign = m.group(1)
-                    if call_sign is None:
-                        call_sign = ""
-                    else:
-                        call_sign = call_sign.upper()
-
-                    # Extract and validate the icon
-                    icon = m.group(3)
-                    if icon is None:
-                        pass
-                    elif icon == "":
-                        icon = None
-                    elif icon == "$$":
-                        pass
-                    else:
-                        icon = icon.upper()
-                        symbol = get_symbol_code(icon)
-                        if symbol is None:
-                            self._send_mesh_message(
-                                fromId,
-                                "Invalid icon. See: https://github.com/afourney/aprstastic/blob/main/APRS_SYMBOLS.md",
-                            )
-                            return
+                    call_sign = m.group(1).upper()
+                    icon = None
 
                     # Update the database
                     if fromId in self._registry:
@@ -376,7 +281,7 @@ class Gateway(object):
                         self._spotted(fromId)
                         self._send_mesh_message(
                             fromId,
-                            "Registered. Send APRS messages by replying here, and prefixing your message with the dest callsign. E.g., 'WLNK-1: hello' ",
+                            "Registered. Send APRS messages by replying here and prefixing your message with the destination callsign. Example: 'DEST-CALL: hello'.",
                         )
                     self._spotted(fromId)  # Run this again to update subscriptions
 
@@ -386,7 +291,7 @@ class Gateway(object):
                 else:
                     self._send_mesh_message(
                         fromId,
-                        "Invalid call sign + ssid.\nSYNTAX: !register [CALLSIGN]-[SSID]\nE.g.,\n!register N0CALL-1",
+                        "Invalid call sign.\nSYNTAX: !register [CALLSIGN]-[SSID]\nE.g.,\n!register N0CALL-1",
                     )
                 return
 
@@ -437,9 +342,24 @@ class Gateway(object):
             else:
                 self._send_mesh_message(
                     fromId,
-                    "Please prefix your message with the dest callsign. E.g., 'WLNK-1: hello'",
+                    "Please prefix your message with the destination callsign. Example: 'DEST-CALL: hello'.",
                 )
                 return
+
+        if portnum == "MESHCORE_CHANNEL_TEXT_MESSAGE":
+            message_string = packet["decoded"]["payload"].decode("utf-8")
+            channel_text = message_string.rsplit(":", 1)[-1].strip("\x00 \t\r\n")
+            if (
+                packet["decoded"].get("channel_idx") == 0
+                and channel_text.casefold() == "aprs?"
+            ):
+                logger.info("Received Public channel online query (aprs?).")
+                self._interface.sendChannelText(
+                    'MC-APRS Gateway online. Send a DM to this node with "?" for help.',
+                    channelIndex=0,
+                )
+                self._interface.sendFloodAdvert()
+            return
 
         # At this point the message was not handled yet. Announce yourself
         if should_announce:
@@ -463,10 +383,14 @@ class Gateway(object):
             # Is this a registration beacon?
             if tocall == REGISTRATION_BEACON:
                 mesh_id = packet.get("message_text", "").lower().strip()
-                m = re.search(r"^(![a-f0-9]{8})(:(\$\$|[A-Za-z0-9]{2,3}))?$", mesh_id)
+                m = re.search(
+                    r"^(!(?:[a-f0-9]{8}|[a-f0-9]{12}))"
+                    r"(?::(\$\$|[A-Za-z0-9]{2,3}))?$",
+                    mesh_id,
+                )
                 if m:
                     mesh_id = m.group(1)
-                    icon = m.group(3)
+                    icon = m.group(2)
 
                     # Validate the icon
                     if icon is None:
@@ -480,7 +404,7 @@ class Gateway(object):
                             icon = None
 
                     # Handle tombstones
-                    if mesh_id == MESH_TOMBSTONE:
+                    if mesh_id in (MESH_TOMBSTONE, "!00000000"):
                         mesh_id = None
                     if fromcall == APRS_TOMBSTONE:
                         fromcall = None
@@ -577,47 +501,6 @@ class Gateway(object):
         aprs_lon_deg = abs(int(lon))
         aprs_lon_min = float((lon - aprs_lon_deg) * 60)
         return f"%03d%05.2f%s" % (aprs_lon_deg, aprs_lon_min, aprs_lon_ew)
-
-    def _send_aprs_position(self, fromcall, lat, lon, t, icon, message):
-        message = self._truncate_message(message, MAX_APRS_POSITION_MESSAGE_LENGTH)
-
-        aprs_lat = self._aprs_lat(lat)
-        aprs_lon = self._aprs_lon(lon)
-
-        # Get the icon
-        if icon is None:
-            icon = DEFAULT_NODE_ICON
-
-        # Convert it into a symbol
-        symbol = get_symbol_code(icon)
-        if symbol is None:
-            symbol = DEFAULT_NODE_SYMBOL
-
-        aprs_msg = None
-        if t is None:
-            # No timestamp
-            aprs_msg = "=" + aprs_lat + symbol[0] + aprs_lon + symbol[1] + message
-        else:
-            aprs_ts = datetime.utcfromtimestamp(t).strftime("%d%H%M")
-            if len(aprs_ts) == 5:
-                aprs_ts = "0" + aprs_ts + "z"
-            else:
-                aprs_ts = aprs_ts + "z"
-            aprs_msg = (
-                "@" + aprs_ts + aprs_lat + symbol[0] + aprs_lon + symbol[1] + message
-            )
-
-        packet = (
-            fromcall
-            + ">"
-            + APRS_SOFTWARE_ID
-            + ",WIDE1-1,qAR,"
-            + self._gateway_call_sign
-            + ":"
-            + aprs_msg
-        )
-        logger.debug(f"Sending to APRS: {packet}")
-        self._aprs_client.send(packet)
 
     def _send_aprs_gateway_beacon(self, lat, lon, icon, message):
         aprs_lat = self._aprs_lat(lat)

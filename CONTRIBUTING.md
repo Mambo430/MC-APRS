@@ -8,8 +8,8 @@ The current build environment uses `pre-commit`, and `hatch`.
 
 ```console
 pip install hatch
-git clone git@github.com:afourney/aprstastic.git
-cd aprstastic
+git clone https://github.com/Mambo430/MC-APRS.git
+cd MC-APRS
 pre-commit install
 
 # Optionally run the pre-commit scripts at any time
@@ -18,13 +18,13 @@ pre-commit run --all-files
 
 ### Running and testing:
 
-From the aprstastic directory:
+From the MC-APRS checkout directory:
 
 ```console
 hatch shell
 
 # Running
-python -m aprstastic
+python -m mc_aprs
 
 
 # Testing

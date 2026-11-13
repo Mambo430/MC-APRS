@@ -1,7 +1,7 @@
-# aprstastic
+# MC-APRS
 
-[![PyPI - Version](https://img.shields.io/pypi/v/aprstastic.svg)](https://pypi.org/project/aprstastic)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/aprstastic.svg)](https://pypi.org/project/aprstastic)
+[![PyPI - Version](https://img.shields.io/pypi/v/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/mc-aprs.svg)](https://pypi.org/project/mc-aprs)
 
 ---
 
@@ -9,37 +9,35 @@
 > Legal operation of this software requires an amateur radio license and a valid call sign.
 
 > [!NOTE]
-> Star this repo to follow our progress! This code is under active development, and contributions are both welcomed and appreciated. See [CONTRIBUTING.md](https://github.com/afourney/aprstastic/blob/main/CONTRIBUTING.md) for details.
+> This code is under active development, and contributions are welcomed. See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ## New!
 
-:fire: Change your node's icons. See [APRS_SYMBOLS.md](https://github.com/afourney/aprstastic/blob/main/APRS_SYMBOLS.md) for details.
+:fire: Change the gateway's APRS map icon. See [APRS_SYMBOLS.md](./APRS_SYMBOLS.md) for details.
 
 :fire: 2-minute [YouTube demo](https://www.youtube.com/watch?v=qUvpZUwl-cY)
 
-:fire: Over-the-air discovery and registration now supported. See image below.
-
 :fire: Call sign registrations are now (optionally) beaconed to [MESHID-01](https://aprs.fi/?c=message&call=MESHID-01) to facilitate a global roaming profile.
+
+The bundled registration database updates from the MC-APRS repository. Local and APRS-beaconed registrations are also supported.
 
 ## Introduction
 
-`aprstastic` is a bidirectional Meshtastic APRS gateway for Meshtastic users **with amateur radio licenses**. It runs on stock Meshtastic devices (LongFast, 915MHz, etc.), allowing you to participate and extend the public network, while using pre-registered associations between Meshtastic device IDs and amateur radio call signs to _bidirectionally_ gate APRS packets in a way that is compliant with FCC regulations. To this end, operation requires at least two Meshtastic devices: one to serve as the gateway, and the others are the clients. The following image demonstrates how operators can register with the gateway (and the broader global network, if registration beaconing is enabled):
+MC-APRS is a bidirectional MeshCore APRS gateway for operators **with amateur radio licenses**. It connects to a MeshCore Companion over its serial interface and uses direct messages plus pre-registered MeshCore public-key prefixes to associate operators with amateur radio call signs. Operation requires a Companion gateway and MeshCore client nodes.
 
-![Example aprstastic registration flow. Start by sending 'aprs?' to any public channel. Wait for a direct message. Reply with !register CALLSIGN-SSID.](https://github.com/afourney/aprstastic/blob/main/imgs/flow.png "Example aprstastic registration flow.")
+Direct messages to the gateway are forwarded to APRS-IS using the registered call sign. APRS messages addressed to that call sign are sent as MeshCore direct messages to the registered contact. If registration beaconing is enabled, the public-key-prefix-to-call-sign association is also announced to `MESHID-01` so other compatible gateways can learn it.
 
-In this scenario, direct messages to the gateway will be forwarded to APRS with the "from" call sign `KK7CMT-8`. Likewise, APRS messages addressed to `KK7CMT-8` will be routed to the originating/registered Meshtastic device via direct message. If registration beaconing is enabled, registration will also trigger a one-time APRS broadcast of the device-id to call sign mapping, allowing all other participating `aprstastic` gateways to learn the association. This enables devices to roam between participating gateways.
+The original Meshtastic edition is demonstrated in this [YouTube video](https://www.youtube.com/watch?v=qUvpZUwl-cY); it does not demonstrate the MeshCore serial interface.
 
-These interactions are demonstrated in the following YouTube video [https://www.youtube.com/watch?v=qUvpZUwl-cY](https://www.youtube.com/watch?v=qUvpZUwl-cY)
-
-Each gateway mimics an iGate, and can support multiple Meshtastic users, as long as their call signs and devices are pre-registered.
+Each gateway mimics an iGate and can support multiple MeshCore users, provided their call signs are registered. MeshCore contacts must be available to the Companion for the gateway to send them messages.
 
 ## Special Commands
 
-Various special commands can be issued by sending direct Meshtastic messages to the gateway. The following commands are currently supported.
+Various special commands can be issued by sending direct MeshCore messages to the gateway. The following commands are currently supported.
 
 **Register a device:**
 
-Use the following command to register a Meshtastic device to a call sign, replacing `<YOUR_CALLSIGN>` appropriately:
+Use the following command to register the sending MeshCore public-key prefix to a call sign, replacing `<YOUR_CALLSIGN>` appropriately:
 
 ```
 !register <YOUR_CALLSIGN>
@@ -53,7 +51,7 @@ e.g.,
 
 **Unregister a device:**
 
-Use the following command to unregister a Meshtastic device AND call sign.
+Use the following command to unregister the sending MeshCore contact and its call sign.
 
 ```
 !unregister
@@ -67,61 +65,64 @@ Use the following command to print the gateway's info and version.
 !version
 ```
 
+**Check whether the gateway is online:**
+
+Send `aprs?` as a direct message for a private online reply, or send it on Public/channel 0 for a public response. The command is case-insensitive and does not require registration. Channel 0 messages may include a sender prefix (for example, `KQ4WAA-MAMBO: aprs?`); the gateway recognizes the command after that prefix. For each channel request, it sends a Flood Advert after its reply so nearby nodes can discover it and start a direct conversation, regardless of the periodic auto-advert setting or when the previous advert was sent.
+
 ## Installation, Configuration, and Running
 
-```console
-pip install aprstastic
-```
+On Debian-based systems, install and run the edited copy from a local clone in a virtual environment. This avoids trying to modify the OS-managed Python installation (PEP 668):
 
 ```console
-python -m aprstastic
+cd /home/spiritual/MC-APRS
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python -m mc_aprs
 ```
 
-The first time aprstastic runs, it will create a sample `aprstastic.yaml` file. **Edit the sample**, then run it again.
+The editable install uses the code in this checkout, so changes you make are available without reinstalling. Always use `.venv/bin/python` to run this checkout; `/usr/bin/python` is separate and will not see the package installed in the virtual environment. `pip install mc-aprs` installs the published PyPI release and will not include unpublished local changes.
+
+To install the published release instead:
 
 ```console
-nano ~/.config/aprstastic/aprstastic.yaml
-python -m aprstastic
+python3 -m venv .venv
+.venv/bin/python -m pip install mc-aprs
+.venv/bin/python -m mc_aprs
 ```
+
+The installation name is `mc-aprs`; the Python module name is `mc_aprs`.
+
+The first time MC-APRS runs, it will create a sample `mc-aprs.yaml` file. **Edit the sample**, then run it again.
+
+```console
+nano ~/.config/mc-aprs/mc-aprs.yaml
+.venv/bin/python -m mc_aprs
+```
+
+Set `meshcore_interface.device` to the Companion serial port (for example, `/dev/ttyACM0`) and ensure the account running MC-APRS has permission to access it. The serial baud rate defaults to `115200`.
+
+To enable periodic MeshCore Flood Advertisements from the Companion, set `meshcore_interface.flood_advert: true`. MC-APRS sends one when it connects, then every 12 hours. It is disabled by default.
+
+Gateway APRS beacon coordinates are entered manually under `gateway_beacon.latitude` and `gateway_beacon.longitude`. MeshCore client position reports are not forwarded by this gateway.
 
 ## Addressing APRS messages
 
-How does the gateway know the addressee ("to" address) of APRS packets when all Meshtastic messages are addressed to the gateway device?
-
-To address this, we adopt the "CALLSIGN: " convention. Messages should start with the addressee's call sign, followed by a colon. **If this is omitted, then the call sign of the addressee is taken to be that of the previous message (i.e., to respond to the previously received message).**
-
-As an example, from Meshtastic you could interact with the Winlink gateway (WLNK-1) as follows:
+Prefix a MeshCore message with the APRS destination callsign and a colon:
 
 ```
-WLNK-1: ?
+DEST-CALL: your message
 ```
 
-The reply from Winlink would be:
-
-```
-NOCALL-1: SP, SMS, L, R#, K#, Y#, F#, P, G, A, I, PR, B (? + cmd for more)
-```
-
-You could then simply enter:
-
-```
-L
-```
-
-and it would assume a reply to `WLNK-1`, producing the following response:
-
-```
-NOCALL-1: 10/11/2024 23:52:30 No messages.
-```
+After the first addressed message, replies can omit the destination prefix and will go to the last APRS station contacted by that MeshCore device. Text replies from APRS stations, including service error messages, are forwarded to the registered MeshCore device.
 
 ## Compliance
 
-aprstastic only allows messages to transit if they are found in the client device-to-callsign mapping, and are thus attributable to a licensed operator. Random messages published on channels like LongFast, or from other devices do not qualify. All messages are unencrypted before they leave Meshtastic, so all APRS traffic is clear text.
+MC-APRS only forwards messages from registered MeshCore contacts, attributing each forwarded message to a call sign. Channel messages are not forwarded. Messages sent from the gateway to APRS-IS are clear text, as is APRS traffic generally.
 
 ## A Note for APRS-IS Admins
 
-Instances of the aprstastic gateway identify themselves to the APRS-IS level 2 servers with the software version number `APZMAG`. In accordance to the [Protocol Reference](http://www.aprs.org/doc/APRS101.PDF), `APZ` designates an experimental application in development. In this case, `MAG` is short for 'Meshtastic-APRS Gateway'.
+MC-APRS identifies itself to APRS-IS level 2 servers with the software version number `APZMCG`. In accordance with the [Protocol Reference](http://www.aprs.org/doc/APRS101.PDF), `APZ` designates an experimental application in development; `MCG` identifies the MeshCore gateway.
 
 ## License
 
-`aprstastic` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+MC-APRS is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.

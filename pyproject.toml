@@ -3,9 +3,9 @@ requires = ["hatchling >= 1.26.1"]
 build-backend = "hatchling.build"
 
 [project]
-name = "aprstastic"
+name = "mc-aprs"
 dynamic = ["version"]
-description = 'A Meshtastic-APRS Gateway'
+description = 'A MeshCore-APRS Gateway'
 readme = "README.md"
 requires-python = ">=3.10"
 #license = "MIT"
@@ -17,8 +17,8 @@ keywords = [
     "gateway",
     "lora",
     "lora-gateway",
-    "meshtastic",
-    "meshtastic-gateway",
+    "meshcore",
+    "meshcore-gateway",
 ]
 authors = [
   { name = "Adam Fourney", email = "adam.fourney@gmail.com" },
@@ -34,38 +34,39 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "meshtastic",
+  "meshcore",
   "aprslib",
+  "PyYAML",
   "requests",
   "packaging",
 ]
 
 [project.urls]
-Documentation = "https://github.com/afourney/aprstastic#readme"
-Issues = "https://github.com/afourney/aprstastic/issues"
-Source = "https://github.com/afourney/aprstastic"
+Documentation = "https://github.com/Mambo430/MC-APRS#readme"
+Issues = "https://github.com/Mambo430/MC-APRS/issues"
+Source = "https://github.com/Mambo430/MC-APRS"
 
 [tool.hatch.version]
-path = "src/aprstastic/__about__.py"
+path = "src/mc_aprs/__about__.py"
 
 [tool.hatch.envs.types]
 extra-dependencies = [
   "mypy>=1.0.0",
 ]
 [tool.hatch.envs.types.scripts]
-check = "mypy --install-types --ignore-missing-imports --non-interactive {args:src/aprstastic tests}"
+check = "mypy --install-types --ignore-missing-imports --non-interactive {args:src/mc_aprs tests}"
 
 [tool.coverage.run]
-source_pkgs = ["aprstastic", "tests"]
+source_pkgs = ["mc_aprs", "tests"]
 branch = true
 parallel = true
 omit = [
-  "src/aprstastic/__about__.py",
+  "src/mc_aprs/__about__.py",
 ]
 
 [tool.coverage.paths]
-aprstastic = ["src/aprstastic", "*/aprstastic/src/aprstastic"]
-tests = ["tests", "*/aprstastic/tests"]
+mc_aprs = ["src/mc_aprs", "*/mc_aprs/src/mc_aprs"]
+tests = ["tests", "*/MC-APRS/tests"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -75,4 +76,4 @@ exclude_lines = [
 ]
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src/aprstastic"]
+only-include = ["src/mc_aprs"]

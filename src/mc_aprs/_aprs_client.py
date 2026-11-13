@@ -10,7 +10,7 @@ from queue import Queue, Empty
 YIELD_DELAY = 0.001
 POLL_DELAY = 0.1
 
-logger = logging.getLogger("aprstastic")
+logger = logging.getLogger("mc_aprs")
 
 
 class APRSClient(object):
@@ -88,6 +88,7 @@ class APRSClient(object):
                         self._aprs.set_filter(self._filters)
                 else:
                     self._aprs.sendall(packet)
+                    logger.info("Transmitted packet to APRS-IS.")
             except Empty:
                 time.sleep(YIELD_DELAY)
             except:

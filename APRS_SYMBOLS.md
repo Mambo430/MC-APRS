@@ -1,35 +1,23 @@
 # APRS Symbols
 
-When registering a call sign with the Gateway, it is often desirable to also
-set the symbol that will represent the device on various applications and maps
-(e.g., [APRS.fi](https://https://aprs.fi/).
+The gateway can use an APRS symbol for its own position beacon on applications
+and maps (e.g., [APRS.fi](https://aprs.fi/)).
 
 Each symbol is represented by a 2- or 3-letter code, as outlined in the tables below.
 
-If the symbol is simple, it will use a two letter code, as listed in the [first table](#simple-symbols).
-For example, `HS` will map to `Human`. You can set this symbol when registering
-(or re-registering) with the gateway. E.g.,
+If the symbol is simple, it uses a two-letter code, as listed in the
+[first table](#simple-symbols). For example, `HS` maps to `Human`. Set the
+gateway symbol in the `gateway_beacon.icon` configuration value:
 
 ```
-!register <call sign> <symbol>
+gateway_beacon:
+  icon: "HS"
 ```
 
-```
-!register N0CALL-1 HS
-```
-
-You can also set various composite overlay symbols with a 3-letter code, as per the
-[second table](#overlay-symbols) below. In this case, the first two letters define the symbol, and the
-third letter defines the overlay (must be A-Z or 0-9). For example 'OGM' represents
-a gateway station (diamond) with the letter M overlaid.
-
-```
-!register <call sign> <symbol_and_overlay>
-```
-
-```
-!register N0CALL-1 OGM
-```
+Composite overlay symbols use a three-letter code, as listed in the
+[second table](#overlay-symbols). The first two letters define the symbol; the
+third letter is an overlay (A-Z or 0-9). For example, `OGM` represents a
+gateway station symbol with an `M` overlay.
 
 ## Simple Symbols
 

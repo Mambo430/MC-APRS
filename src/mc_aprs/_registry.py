@@ -13,7 +13,7 @@ import os
 from packaging.version import Version
 from .__about__ import __version__
 
-logger = logging.getLogger("aprstastic")
+logger = logging.getLogger("mc_aprs")
 
 DATABASE_FILE = "registrations.db"
 
@@ -30,7 +30,7 @@ COL_TIMESTAMP = 3
 class CallSignRegistry(object):
     """
     There are three potential sources of registration data:
-        - local (via direct Meshtastic messages to this device)
+        - local (via direct MeshCore messages to this device)
         - beaconed (observing registration beacons to APRS)
         - precompiled (a precompiled database, downloaded from the web, to seed things)
 
@@ -242,11 +242,12 @@ CREATE TABLE IF NOT EXISTS BeaconedRegistrations (
         cached_timestamp = precompiled_data.get("download_timestamp", 0)
         now = time.time()
 
-        # It's older than a day, so download a new one
-        if now - cached_timestamp > 3600 * 24:
+        # Download updates only when an MC-APRS registry endpoint is configured.
+        registry_url = precompiled_data.get("url")
+        if registry_url and now - cached_timestamp > 3600 * 24:
             logger.debug("Downloading precompiled database.")
             try:
-                response = requests.get(precompiled_data.get("url"))
+                response = requests.get(registry_url)
                 response.raise_for_status()
                 new_data = json.loads(response.text)
 
@@ -254,7 +255,7 @@ CREATE TABLE IF NOT EXISTS BeaconedRegistrations (
                 min_version = new_data.get("min_package_version", "0.0.1a1")
                 if Version(__version__) < Version(min_version):
                     logger.error(
-                        f"Remote precompiled database requires at least aprstastic version '{min_version}'. Please upgrade."
+                        f"Remote precompiled database requires at least MC-APRS version '{min_version}'. Please upgrade."
                     )
                 elif "tuples" not in new_data:
                     logger.error(

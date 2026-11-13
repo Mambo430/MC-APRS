@@ -6,7 +6,7 @@ import json
 import time
 import shutil
 
-from aprstastic._aprs_symbols import get_symbol_code, APRS_SYMBOLS, APRS_OVERLAYS
+from mc_aprs._aprs_symbols import get_symbol_code, APRS_SYMBOLS, APRS_OVERLAYS
 
 
 def test_symbol_codes():

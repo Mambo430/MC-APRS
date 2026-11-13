@@ -6,7 +6,8 @@ import json
 import sqlite3
 import time
 import shutil
-from aprstastic._registry import (
+from unittest.mock import patch
+from mc_aprs._registry import (
     CallSignRegistry,
     DATABASE_FILE,
     OVERRIDES_FILE,
@@ -20,6 +21,12 @@ data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data")
 
 
 def test_initialize_registry():
+    class Response:
+        text = json.dumps({"reported_timestamp": 0, "tuples": []})
+
+        def raise_for_status(self):
+            pass
+
     db_file = os.path.join(data_dir, DATABASE_FILE)
     precompiled_file = os.path.join(data_dir, PRECOMPILED_FILE)
 
@@ -33,7 +40,8 @@ def test_initialize_registry():
     assert not os.path.isfile(precompiled_file)
 
     # Initialize the registry
-    registry = CallSignRegistry(data_dir)
+    with patch("mc_aprs._registry.requests.get", return_value=Response()):
+        registry = CallSignRegistry(data_dir)
 
     # Make sure the files now exist
     assert os.path.isfile(db_file)
@@ -50,6 +58,21 @@ def test_initialize_registry():
     rows = cursor.fetchall()
     assert len(rows) == 1
     conn.close()
+
+
+def test_precompiled_registry_without_endpoint_skips_download(tmp_path, monkeypatch):
+    def unexpected_download(*args, **kwargs):
+        raise AssertionError("No precompiled registry endpoint is configured.")
+
+    monkeypatch.setattr("mc_aprs._registry.requests.get", unexpected_download)
+    shutil.copyfile(
+        os.path.join(data_dir, EMPTY_PRECOMPILED_FILE),
+        os.path.join(tmp_path, PRECOMPILED_FILE),
+    )
+
+    registry = CallSignRegistry(str(tmp_path))
+
+    assert len(registry) == 0
 
 
 def test_inserts_and_updates():
@@ -70,6 +93,10 @@ def test_inserts_and_updates():
     assert not os.path.isfile(precompiled_file)
 
     # Initialize the registry
+    shutil.copyfile(
+        os.path.join(data_dir, EMPTY_PRECOMPILED_FILE),
+        precompiled_file,
+    )
     registry = CallSignRegistry(data_dir)
     # Use only the database
     registry._overrides = {}

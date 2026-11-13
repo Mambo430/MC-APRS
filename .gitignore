@@ -164,5 +164,5 @@ cython_debug/
 # project - specific
 tests/test_data/precompiled_registrations.json
 tests/test_data/registrations.db
-tests/test_data/aprstastic.yaml
+tests/test_data/mc-aprs.yaml
 tests/test_data/registration_overrides.json

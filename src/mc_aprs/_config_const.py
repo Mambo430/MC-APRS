@@ -1,5 +1,5 @@
 DEFAULT_CONFIG_CONTENT = """# 
-# APRSTASTIC CONFIGURATION FILE (version: 1)
+# MC-APRS CONFIGURATION FILE (version: 1)
 # Be sure to at least modify 'call_sign' and 'aprsis_passcode'.
 #
 
@@ -17,12 +17,13 @@ aprsis_passcode: 12345
 # max_aprs_message_length: 128
 
 
-# Only serial devices are supported right now. 
-# If 'device' is null (or commented out), an attempt will be made to 
-# detected it automatically.
-meshtastic_interface: 
-   type: serial
-#  device: /dev/ttyACM0
+# MeshCore Companion serial connection
+meshcore_interface:
+  type: serial
+  device: /dev/ttyACM0
+  baudrate: 115200
+  # Send a Flood Advert on startup, then every 12 hours
+  flood_advert: false
 
 
 # Beacon new registrations to APRS-IS to facilitate discovery
@@ -33,8 +34,8 @@ beacon_registrations: true
 gateway_beacon:
   enabled: true
   icon: "OGM"                 # 'M' in a diamond, representing a Gateway
-#  latitude: 47.6205063,      # Leave commented to read position from Meshtastic device
-#  longitude: -122.3518523    # Leave commented to read position from Meshtastic device
+#  latitude: 47.6205063       # Enter gateway coordinates manually for APRS beaconing
+#  longitude: -122.3518523
 
 
 # Where should logs be stored?

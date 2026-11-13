@@ -6,10 +6,10 @@ import json
 import sqlite3
 import time
 import shutil
-from aprstastic._registry import (
+from mc_aprs._registry import (
     CallSignRegistry,
 )
-from aprstastic.__about__ import __version__
+from mc_aprs.__about__ import __version__
 
 
 def main(data_dir):
@@ -20,7 +20,7 @@ def main(data_dir):
         "package_version": __version__,
         "download_timestamp": time.time(),
         "reported_timestamp": time.time(),
-        "url": "https://raw.githubusercontent.com/afourney/aprstastic/refs/heads/main/src/aprstastic/res/precompiled_registrations.json",
+        "url": "https://raw.githubusercontent.com/Mambo430/MC-APRS/refs/heads/main/src/mc_aprs/res/precompiled_registrations.json",
         "tuples": [],
     }
 

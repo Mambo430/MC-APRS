@@ -1,5 +1,5 @@
 # Design Document
 
-Tracking of upcoming features has moved to [issues](https://github.com/afourney/aprstastic/issues).
+Track upcoming features in the [MC-APRS issue tracker](https://github.com/Mambo430/MC-APRS/issues).
 
 This file is maintained to support prior direct links from social media.

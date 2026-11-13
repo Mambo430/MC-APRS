@@ -1,5 +1,5 @@
 #
-# APRSTASTIC CONFIGURATION FILE (version: 1)
+# MC-APRS CONFIGURATION FILE (version: 1)
 # Be sure to at least modify 'call_sign' and 'aprsis_passcode'.
 #
 
@@ -9,12 +9,10 @@ call_sign: N0CALL-2
 # APRS-IS passcode. Search Google for how to get this
 aprsis_passcode: 12345
 
-# Only serial devices are supported right now.
-# If 'device' is null (or commented out), an attempt will be made to
-# detected it automatically.
-meshtastic_interface:
+meshcore_interface:
   type: serial
 #  device: /dev/ttyACM0
+#  baudrate: 115200
 
 # Beacon new registrations to APRS-IS to facilitate discovery
 beacon_registrations: false

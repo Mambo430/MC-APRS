@@ -6,7 +6,7 @@ import json
 import time
 import shutil
 
-from aprstastic._config import (
+from mc_aprs._config import (
     ConfigError,
     init_config,
     CONFIG_FILE_NAME,
@@ -16,14 +16,14 @@ from aprstastic._config import (
 )
 
 
-TEST_CONFIG_FILE_NAME_1 = "test_aprstastic_1.yaml"
-TEST_CONFIG_FILE_NAME_2 = "test_aprstastic_2.yaml"
+TEST_CONFIG_FILE_NAME_1 = "test_mc_aprs_1.yaml"
+TEST_CONFIG_FILE_NAME_2 = "test_mc_aprs_2.yaml"
 config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_data")
 
 # Monkey patch the default directory
-import aprstastic._config
+import mc_aprs._config
 
-aprstastic._config.DEFAULT_DATA_DIR = config_dir
+mc_aprs._config.DEFAULT_DATA_DIR = config_dir
 
 logs_dir = os.path.join(config_dir, LOGS_SUBDIR)
 data_dir = os.path.join(config_dir, DATA_SUBDIR)
@@ -96,7 +96,7 @@ def test_load_config():
 {
     "call_sign": "N0CALL-1",
     "aprsis_passcode": 12345,
-    "meshtastic_interface": {
+    "meshcore_interface": {
         "type": "serial"
     },
     "beacon_registrations": true,
@@ -125,7 +125,7 @@ def test_load_config():
 {
     "call_sign": "N0CALL-2",
     "aprsis_passcode": 12345,
-    "meshtastic_interface": {
+    "meshcore_interface": {
         "type": "serial"
     },
     "beacon_registrations": false,

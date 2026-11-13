@@ -3,12 +3,12 @@ import yaml
 import logging
 from ._config_const import DEFAULT_CONFIG_CONTENT
 
-logger = logging.getLogger("aprstastic")
+logger = logging.getLogger("mc_aprs")
 
-CONFIG_FILE_NAME = "aprstastic.yaml"
+CONFIG_FILE_NAME = "mc-aprs.yaml"
 LOGS_SUBDIR = "logs"
 DATA_SUBDIR = "data"
-DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".config", "aprstastic")
+DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".config", "mc-aprs")
 DEFAULT_CALL_SIGN = "N0CALL"
 
 
