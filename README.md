@@ -111,6 +111,62 @@ To enable periodic MeshCore Flood Advertisements from the Companion, set `meshco
 
 Gateway APRS beacon coordinates are entered manually under `gateway_beacon.latitude` and `gateway_beacon.longitude`. MeshCore client position reports are not forwarded by this gateway.
 
+### Run MC-APRS as a systemd service
+
+On Linux systems that use systemd, configure MC-APRS to start automatically at boot. This example assumes the package is installed in `/home/YOUR_USER/.venv`. Replace `YOUR_USER` with the Linux account that will run MC-APRS and adjust the paths if your virtual environment is elsewhere.
+
+Install the published package in that account's virtual environment, then run MC-APRS once as that account to create the sample configuration. Edit the configuration before starting the service:
+
+```console
+python3 -m venv /home/YOUR_USER/.venv
+/home/YOUR_USER/.venv/bin/python -m pip install mc-aprs
+/home/YOUR_USER/.venv/bin/python -m mc_aprs
+nano /home/YOUR_USER/.config/mc-aprs/mc-aprs.yaml
+```
+
+Set `meshcore_interface.device` to the Companion's serial device. Ensure the service account has permission to access it; on Debian-based systems this commonly means adding the account to the `dialout` group:
+
+```console
+sudo usermod -aG dialout YOUR_USER
+```
+
+Create `/etc/systemd/system/mc-aprs.service`:
+
+```ini
+[Unit]
+Description=MC-APRS MeshCore APRS gateway
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+Environment=HOME=/home/YOUR_USER
+WorkingDirectory=/home/YOUR_USER
+ExecStart=/home/YOUR_USER/.venv/bin/python -m mc_aprs
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable the service to start at boot and start it now:
+
+```console
+sudo systemctl daemon-reload
+sudo systemctl enable --now mc-aprs.service
+```
+
+Check the service status and view its logs with:
+
+```console
+sudo systemctl status mc-aprs.service
+sudo journalctl -u mc-aprs.service -f
+```
+
+After editing the service file, run `sudo systemctl daemon-reload` and restart the service. Restart the service after changing the configuration or adding the account to the serial device group.
+
 ## Addressing APRS messages
 
 Prefix a MeshCore message with the APRS destination callsign and a colon:
