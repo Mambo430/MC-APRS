@@ -163,7 +163,10 @@ def test_forced_flood_advert_sends_even_if_recently_sent():
     assert adverts == [True]
 
 
-def test_connect_and_close_runs_meshcore_on_background_event_loop(monkeypatch):
+@pytest.mark.parametrize("connection_type", ["serial", "tcp"])
+def test_connect_and_close_runs_meshcore_on_background_event_loop(
+    monkeypatch, connection_type
+):
     class Client:
         self_info = {"public_key": "a1" * 32}
         contacts = {"contact": {"public_key": "b2" * 32}}
@@ -189,6 +192,7 @@ def test_connect_and_close_runs_meshcore_on_background_event_loop(monkeypatch):
     class FakeMeshCore:
         @staticmethod
         async def create_serial(device, baudrate, auto_reconnect):
+            assert connection_type == "serial"
             assert (device, baudrate, auto_reconnect) == (
                 "/dev/ttyACM0",
                 115200,
@@ -196,8 +200,23 @@ def test_connect_and_close_runs_meshcore_on_background_event_loop(monkeypatch):
             )
             return client
 
+        @staticmethod
+        async def create_tcp(host, port, auto_reconnect):
+            assert connection_type == "tcp"
+            assert (host, port, auto_reconnect) == ("192.168.1.50", 5000, False)
+            return client
+
     monkeypatch.setattr("mc_aprs._meshcore_interface.MeshCore", FakeMeshCore)
-    interface = MeshCoreInterface("/dev/ttyACM0", 115200, lambda packet: None)
+    if connection_type == "serial":
+        interface = MeshCoreInterface("/dev/ttyACM0", 115200, lambda packet: None)
+    else:
+        interface = MeshCoreInterface(
+            "192.168.1.50",
+            115200,
+            lambda packet: None,
+            connection_type="tcp",
+            port=5000,
+        )
 
     assert interface.connect() is interface
     assert interface.getMyNodeInfo()["user"]["id"] == "!a1a1a1a1a1a1"

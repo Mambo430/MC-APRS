@@ -27,6 +27,71 @@ def test_registration_beacon_accepts_legacy_and_meshcore_ids(device_id):
     assert gateway._registry.registrations == [(device_id, "N0CALL-1", None, False)]
 
 
+def test_get_interface_configures_tcp_connection(monkeypatch):
+    created = {}
+
+    class FakeMeshCoreInterface:
+        def __init__(
+            self,
+            endpoint,
+            baudrate,
+            on_message,
+            flood_advert=False,
+            connection_type="serial",
+            port=None,
+        ):
+            created.update(
+                endpoint=endpoint,
+                baudrate=baudrate,
+                on_message=on_message,
+                flood_advert=flood_advert,
+                connection_type=connection_type,
+                port=port,
+            )
+
+        def connect(self):
+            return self
+
+    monkeypatch.setattr("mc_aprs._gateway.MeshCoreInterface", FakeMeshCoreInterface)
+    gateway = Gateway.__new__(Gateway)
+    on_message = lambda packet: None
+
+    interface = gateway._get_interface(
+        {
+            "type": "tcp",
+            "host": "192.168.1.50",
+            "port": 5000,
+            "flood_advert": True,
+        },
+        on_message,
+    )
+
+    assert interface is not None
+    assert created == {
+        "endpoint": "192.168.1.50",
+        "baudrate": 115200,
+        "on_message": on_message,
+        "flood_advert": True,
+        "connection_type": "tcp",
+        "port": 5000,
+    }
+
+
+@pytest.mark.parametrize(
+    ("config", "message"),
+    [
+        ({"type": "tcp", "host": "192.168.1.50"}, "meshcore_interface.port"),
+        ({"type": "tcp", "port": 5000}, "meshcore_interface.host"),
+        ({"type": "bluetooth"}, "meshcore_interface.type"),
+    ],
+)
+def test_get_interface_rejects_invalid_connection_config(config, message):
+    gateway = Gateway.__new__(Gateway)
+
+    with pytest.raises(ValueError, match=message):
+        gateway._get_interface(config, lambda packet: None)
+
+
 def test_aprs_service_error_is_forwarded_to_registered_meshcore_contact():
     gateway = Gateway.__new__(Gateway)
     gateway._registry = {"!abcdef012345": {"call_sign": "KQ4WAA-7"}}

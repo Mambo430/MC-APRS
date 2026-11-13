@@ -70,14 +70,11 @@ class Gateway(object):
 
         # Connect to the MeshCore Companion
         interface_config = self._config.get("meshcore_interface", {})
-        device = interface_config.get("device")
-        baudrate = interface_config.get("baudrate", 115200)
-        flood_advert = interface_config.get("flood_advert", False)
 
         def on_recv(packet, interface=None):
             self._mesh_rx_queue.put(packet)
 
-        self._interface = self._get_interface(device, baudrate, on_recv, flood_advert)
+        self._interface = self._get_interface(interface_config, on_recv)
         node_info = self._interface.getMyNodeInfo()
         self._gateway_id = node_info.get("user", {}).get("id")
         logger.debug(f"Gateway device id: {self._gateway_id}")
@@ -193,14 +190,49 @@ class Gateway(object):
             # Yield
             time.sleep(0.001)
 
-    def _get_interface(self, device, baudrate, on_message, flood_advert=False):
-        if not device:
+    def _get_interface(self, interface_config, on_message):
+        connection_type = interface_config.get("type", "serial")
+        baudrate = interface_config.get("baudrate", 115200)
+        flood_advert = interface_config.get("flood_advert", False)
+        port = None
+
+        if connection_type == "serial":
+            endpoint = interface_config.get("device")
+            if not endpoint:
+                raise ValueError(
+                    "Set 'meshcore_interface.device' to the Companion serial port "
+                    "in 'mc-aprs.yaml'."
+                )
+        elif connection_type == "tcp":
+            endpoint = interface_config.get("host")
+            port = interface_config.get("port")
+            if not endpoint:
+                raise ValueError(
+                    "Set 'meshcore_interface.host' to the MeshCore TCP host in "
+                    "'mc-aprs.yaml'."
+                )
+            if (
+                not isinstance(port, int)
+                or isinstance(port, bool)
+                or not 1 <= port <= 65535
+            ):
+                raise ValueError(
+                    "Set 'meshcore_interface.port' to a TCP port from 1 to 65535 "
+                    "in 'mc-aprs.yaml'."
+                )
+        else:
             raise ValueError(
-                "Set 'meshcore_interface.device' to the Companion serial port in "
-                "'mc-aprs.yaml'."
+                "Set 'meshcore_interface.type' to either 'serial' or 'tcp' "
+                "in 'mc-aprs.yaml'."
             )
+
         return MeshCoreInterface(
-            device, baudrate, on_message, flood_advert=flood_advert
+            endpoint,
+            baudrate,
+            on_message,
+            flood_advert=flood_advert,
+            connection_type=connection_type,
+            port=port,
         ).connect()
 
     def close(self):

@@ -34,7 +34,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "meshcore",
+  "meshcore>=2.3.19",
   "aprslib",
   "PyYAML",
   "requests",

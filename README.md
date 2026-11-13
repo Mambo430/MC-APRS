@@ -105,7 +105,18 @@ nano ~/.config/mc-aprs/mc-aprs.yaml
 .venv/bin/python -m mc_aprs
 ```
 
-Set `meshcore_interface.device` to the Companion serial port (for example, `/dev/ttyACM0`) and ensure the account running MC-APRS has permission to access it. The serial baud rate defaults to `115200`.
+By default, MC-APRS connects to the Companion over serial. Set `meshcore_interface.device` to the serial port (for example, `/dev/ttyACM0`) and ensure the account running MC-APRS has permission to access it. The serial baud rate defaults to `115200`.
+
+To connect over TCP instead, configure the host and port exposed by the MeshCore node:
+
+```yaml
+meshcore_interface:
+  type: tcp
+  host: 192.168.1.50
+  port: 5000
+```
+
+Replace the example address and port with the values for your node. The TCP port must be explicitly configured; MC-APRS does not assume a default. Use a trusted network or VPN and restrict access to the node's TCP port to trusted clients.
 
 To enable periodic MeshCore Flood Advertisements from the Companion, set `meshcore_interface.flood_advert: true`. MC-APRS sends one when it connects, then every 12 hours. It is disabled by default.
 
@@ -124,11 +135,13 @@ python3 -m venv /home/YOUR_USER/.venv
 nano /home/YOUR_USER/.config/mc-aprs/mc-aprs.yaml
 ```
 
-Set `meshcore_interface.device` to the Companion's serial device. Ensure the service account has permission to access it; on Debian-based systems this commonly means adding the account to the `dialout` group:
+For a serial connection, set `meshcore_interface.device` to the Companion's serial device. Ensure the service account has permission to access it; on Debian-based systems this commonly means adding the account to the `dialout` group:
 
 ```console
 sudo usermod -aG dialout YOUR_USER
 ```
+
+For a TCP connection, configure `meshcore_interface` with `type: tcp`, `host`, and `port` as described above; serial-device permissions are not needed.
 
 Create `/etc/systemd/system/mc-aprs.service`:
 

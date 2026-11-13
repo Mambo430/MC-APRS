@@ -17,11 +17,15 @@ aprsis_passcode: 12345
 # max_aprs_message_length: 128
 
 
-# MeshCore Companion serial connection
+# MeshCore Companion connection (serial or TCP)
 meshcore_interface:
   type: serial
   device: /dev/ttyACM0
   baudrate: 115200
+  # For TCP, use type: tcp with a host and port instead of device and baudrate.
+  # type: tcp
+  # host: 192.168.1.50
+  # port: 5000
   # Send a Flood Advert on startup, then every 12 hours
   flood_advert: false
 

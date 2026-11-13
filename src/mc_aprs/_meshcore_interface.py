@@ -11,11 +11,21 @@ FLOOD_ADVERT_INTERVAL = 12 * 60 * 60
 
 
 class MeshCoreInterface:
-    def __init__(self, device, baudrate, on_message, flood_advert=False):
-        self._device = device
+    def __init__(
+        self,
+        endpoint,
+        baudrate,
+        on_message,
+        flood_advert=False,
+        connection_type="serial",
+        port=None,
+    ):
+        self._endpoint = endpoint
         self._baudrate = baudrate
         self._on_message = on_message
         self._flood_advert = flood_advert
+        self._connection_type = connection_type
+        self._port = port
         self._loop = None
         self._loop_ready = threading.Event()
         self._thread = None
@@ -40,7 +50,7 @@ class MeshCoreInterface:
             future.cancel()
             self.close()
             raise
-        logger.info(f"Connected to MeshCore Companion on {self._device}")
+        logger.info(f"Connected to MeshCore node on {self._connection_description}")
         return self
 
     async def _connect(self):
@@ -50,14 +60,25 @@ class MeshCoreInterface:
             self._flood_advert_task = asyncio.create_task(self._send_flood_adverts())
 
     async def _create_client(self):
-        client = await MeshCore.create_serial(
-            self._device,
-            baudrate=self._baudrate,
-            auto_reconnect=False,
-        )
+        if self._connection_type == "serial":
+            client = await MeshCore.create_serial(
+                self._endpoint,
+                baudrate=self._baudrate,
+                auto_reconnect=False,
+            )
+        elif self._connection_type == "tcp":
+            client = await MeshCore.create_tcp(
+                self._endpoint,
+                self._port,
+                auto_reconnect=False,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported MeshCore connection type: {self._connection_type}"
+            )
         if client is None:
             raise ConnectionError(
-                f"Unable to connect to MeshCore Companion on {self._device}."
+                f"Unable to connect to MeshCore node on {self._connection_description}."
             )
 
         try:
@@ -79,6 +100,12 @@ class MeshCoreInterface:
             raise
         return client
 
+    @property
+    def _connection_description(self):
+        if self._connection_type == "tcp":
+            return f"{self._endpoint}:{self._port}"
+        return self._endpoint
+
     async def _monitor_connection(self):
         while not self._stopping:
             await asyncio.sleep(1)
@@ -86,7 +113,8 @@ class MeshCoreInterface:
                 continue
 
             logger.warning(
-                f"MeshCore Companion disconnected from {self._device}; " "reconnecting."
+                f"MeshCore node disconnected from {self._connection_description}; "
+                "reconnecting."
             )
             client = self._client
             self._client = None
@@ -98,11 +126,15 @@ class MeshCoreInterface:
             while not self._stopping:
                 try:
                     self._client = await self._create_client()
-                    logger.info(f"Reconnected to MeshCore Companion on {self._device}")
+                    logger.info(
+                        f"Reconnected to MeshCore node on "
+                        f"{self._connection_description}"
+                    )
                     break
                 except Exception:
                     logger.exception(
-                        f"Unable to reconnect to MeshCore Companion on {self._device}; "
+                        f"Unable to reconnect to MeshCore node on "
+                        f"{self._connection_description}; "
                         f"retrying in {RECONNECT_DELAY} seconds."
                     )
                     await asyncio.sleep(RECONNECT_DELAY)
