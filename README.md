@@ -27,6 +27,10 @@ Direct messages to the gateway are forwarded to APRS-IS using the registered cal
 The original Meshtastic edition is demonstrated in this [YouTube video](https://www.youtube.com/watch?v=qUvpZUwl-cY); it does not demonstrate the MeshCore serial interface.
 
 Each gateway mimics an iGate and can support multiple MeshCore users, provided their call signs are registered. MeshCore contacts must be available to the Companion for the gateway to send them messages.
+| aprs? | Advert | Demo |
+| :---: | :---: | :---: |
+| ![Public_aprs?](imgs/Public_aprs%3F.png) | ![Advert](imgs/Advert.png) | ![Demo](imgs/Demo.png) |
+
 
 ## Special Commands
 
