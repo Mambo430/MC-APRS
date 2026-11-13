@@ -80,7 +80,7 @@ On Debian-based systems, install and run the edited copy from a local clone in a
 
 ```console
 git clone https://github.com/Mambo430/MC-APRS.git
-cd /home/spiritual/MC-APRS
+cd MC-APRS
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/python -m mc_aprs
