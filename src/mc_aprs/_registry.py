@@ -50,6 +50,7 @@ class CallSignRegistry(object):
         )
         self._overrides = self._load_overrides(os.path.join(data_dir, OVERRIDES_FILE))
         self._merged = dict()
+        self._timestamps = dict()
 
         self._rebuild()
 
@@ -174,6 +175,7 @@ CREATE TABLE IF NOT EXISTS BeaconedRegistrations (
         operations.sort(key=lambda x: x[COL_TIMESTAMP])
 
         self._merged = dict()
+        self._timestamps = dict()
         for op in operations:
             d_id = op[COL_DEVICE_ID]
             icon = op[COL_SETTINGS]
@@ -184,8 +186,10 @@ CREATE TABLE IF NOT EXISTS BeaconedRegistrations (
             # Delete the prior value(s)
             if d_id is not None and d_id in self._merged:
                 del self._merged[d_id]
+                self._timestamps.pop(d_id, None)
             if cs_key is not None and cs_key in self._merged:
                 del self._merged[cs_key]
+                self._timestamps.pop(cs_key, None)
 
             # If either the device id or call sign are None, then continue
             # (this is a tombstone)
@@ -193,7 +197,8 @@ CREATE TABLE IF NOT EXISTS BeaconedRegistrations (
                 continue
 
             # Update
-            self._merged[d_id] = {"call_sign": cs, "icon": icon, "timestamp": timestamp}
+            self._merged[d_id] = {"call_sign": cs, "icon": icon}
+            self._timestamps[d_id] = timestamp
 
         cursor.close()
 

@@ -42,13 +42,18 @@ class APRSClient(object):
             if raw:
                 return packet
             else:
+                packet_text = (
+                    packet.decode("utf-8", errors="replace")
+                    if isinstance(packet, bytes)
+                    else packet
+                )
                 try:
                     return parse(packet)
                 except ParseError:
-                    logger.error("ParseError: " + packet.strip())
+                    logger.error("ParseError: " + packet_text.strip())
                     return None
                 except UnknownFormat:
-                    logger.error("UnknownFormat: " + packet.strip())
+                    logger.error("UnknownFormat: " + packet_text.strip())
                     return None
         except Empty:
             return None
