@@ -148,8 +148,12 @@ class MeshCoreInterface:
 
             try:
                 sent = await self._send_flood_advert()
-            except Exception:
-                logger.exception("Unable to send MeshCore Flood Advert; retrying.")
+            except Exception as exc:
+                logger.warning(
+                    "Unable to send MeshCore Flood Advert: %s; retrying in %s seconds.",
+                    exc,
+                    RECONNECT_DELAY,
+                )
                 await asyncio.sleep(RECONNECT_DELAY)
                 continue
 

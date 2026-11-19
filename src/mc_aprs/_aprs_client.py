@@ -4,11 +4,12 @@ import traceback
 import aprslib
 import logging
 from aprslib.parsing import parse
-from aprslib.exceptions import ParseError, UnknownFormat
+from aprslib.exceptions import ConnectionDrop, ParseError, UnknownFormat
 from queue import Queue, Empty
 
 YIELD_DELAY = 0.001
 POLL_DELAY = 0.1
+RECONNECT_DELAY = 5
 
 logger = logging.getLogger("mc_aprs")
 
@@ -101,18 +102,28 @@ class APRSClient(object):
                 raise
 
     def _rx_thread_body(self) -> None:
-        try:
-            self._aprs = aprslib.IS(self._login, passwd=self._passcode, port=14580)
-            assert self._aprs is not None
-            if self._filters is not None:
-                self._aprs.set_filter(self._filters)
-            self._aprs.connect()
-            self._aprs.consumer(
-                lambda x: self._rx_queue.put(x, block=True), raw=True, blocking=True
-            )
-        except:
-            logger.error(traceback.format_exc())
-            raise
+        while True:
+            try:
+                self._aprs = aprslib.IS(
+                    self._login, passwd=self._passcode, port=14580
+                )
+                if self._filters is not None:
+                    self._aprs.set_filter(self._filters)
+                self._aprs.connect()
+                self._aprs.consumer(
+                    lambda x: self._rx_queue.put(x, block=True),
+                    raw=True,
+                    blocking=True,
+                )
+                logger.warning("APRS-IS receive connection closed; reconnecting.")
+            except (ConnectionDrop, OSError) as exc:
+                logger.warning("APRS-IS connection dropped: %s; reconnecting.", exc)
+            except Exception:
+                logger.exception("Unexpected error in APRS-IS receive thread.")
+                raise
+
+            self._aprs = None
+            time.sleep(RECONNECT_DELAY)
 
 
 class _UpdateFilters(object):

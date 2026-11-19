@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import threading
 import time
 from types import SimpleNamespace
@@ -161,6 +162,37 @@ def test_forced_flood_advert_sends_even_if_recently_sent():
 
     assert asyncio.run(interface._send_flood_advert(force=True)) is True
     assert adverts == [True]
+
+
+def test_flood_advert_failure_is_logged_without_traceback(monkeypatch, caplog):
+    result = SimpleNamespace(type=EventType.ERROR, payload={"reason": "busy"})
+
+    class Commands:
+        async def send_advert(self, flood):
+            assert flood is True
+            return result
+
+    interface = MeshCoreInterface("/dev/ttyACM0", 115200, lambda packet: None)
+    interface._client = SimpleNamespace(
+        commands=Commands(),
+        is_connected=True,
+    )
+
+    class StopRetry(Exception):
+        pass
+
+    async def stop_after_retry(delay):
+        assert delay == 5
+        raise StopRetry
+
+    monkeypatch.setattr("mc_aprs._meshcore_interface.asyncio.sleep", stop_after_retry)
+    caplog.set_level(logging.WARNING, logger="mc_aprs")
+
+    with pytest.raises(StopRetry):
+        asyncio.run(interface._send_flood_adverts())
+
+    assert str(result) in caplog.text
+    assert "Traceback" not in caplog.text
 
 
 @pytest.mark.parametrize("connection_type", ["serial", "tcp"])
